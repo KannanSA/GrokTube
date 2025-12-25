@@ -5,6 +5,15 @@
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
+		<string>audio</string>
 	</array>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>We need microphone access for voice chat with Grok to help you find peaceful spots in London.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>Used for real-time voice interaction with Grok.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Your location helps us find the nearest calm spots and tube stations.</string>
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>Your location helps us find the nearest calm spots and tube stations.</string>
 </dict>
 </plist>
