@@ -73,6 +73,11 @@ class AudioPlayerService: NSObject, ObservableObject {
         audioEngine.connect(playerNode, to: mixerNode, format: outputFormat)
         audioEngine.connect(mixerNode, to: audioEngine.mainMixerNode, format: outputFormat)
         
+        // Set volume to maximum for louder playback
+        playerNode.volume = 1.0
+        mixerNode.outputVolume = 1.0
+        audioEngine.mainMixerNode.outputVolume = 1.0
+        
         // Install tap on mixer for level metering
         mixerNode.installTap(onBus: 0, bufferSize: 1024, format: outputFormat) { [weak self] buffer, _ in
             self?.processAudioLevels(buffer: buffer)
@@ -206,15 +211,21 @@ class AudioPlayerService: NSObject, ObservableObject {
     
     /// Play raw PCM audio data received from WebSocket (Int16 format)
     func playPCMInt16Data(_ data: Data, sampleRate: Double = 24000) {
-        // Ensure audio session is configured on main thread first
-        DispatchQueue.main.async {
-            self.configureAudioSession(forPlayback: true)
-        }
-        
         audioQueue.async { [weak self] in
             guard let self = self, data.count > 0 else { 
                 print("⚠️ Empty audio data received")
                 return 
+            }
+            
+            // Configure audio session for playback
+            DispatchQueue.main.async {
+                do {
+                    let session = AVAudioSession.sharedInstance()
+                    try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+                    try session.setActive(true)
+                } catch {
+                    print("❌ Audio session config failed: \(error)")
+                }
             }
             
             self.restartEngineIfNeeded()
@@ -225,6 +236,7 @@ class AudioPlayerService: NSObject, ObservableObject {
             }
             
             let frameCount = UInt32(data.count / MemoryLayout<Int16>.size)
+            print("🎵 Processing \(frameCount) audio frames")
             
             guard frameCount > 0 else {
                 print("⚠️ Frame count is 0")
@@ -247,12 +259,13 @@ class AudioPlayerService: NSObject, ObservableObject {
             
             // Convert to float format for playback
             guard let floatBuffer = self.convertInt16ToFloat(buffer) else {
-                print("❌ Failed to convert buffer to float")
+                print("❌ Failed to convert buffer to float, trying direct")
                 // Try direct Int16 playback as fallback
                 self.scheduleInt16Buffer(buffer)
                 return
             }
             
+            print("🔊 Scheduling audio buffer for playback")
             self.scheduleBuffer(floatBuffer)
         }
     }
@@ -286,21 +299,23 @@ class AudioPlayerService: NSObject, ObservableObject {
     
     private func convertInt16ToFloat(_ int16Buffer: AVAudioPCMBuffer) -> AVAudioPCMBuffer? {
         let floatFormat = AVAudioFormat(standardFormatWithSampleRate: int16Buffer.format.sampleRate, channels: 1)!
+        let frameCount = int16Buffer.frameLength
         
-        guard let converter = AVAudioConverter(from: int16Buffer.format, to: floatFormat),
-              let floatBuffer = AVAudioPCMBuffer(pcmFormat: floatFormat, frameCapacity: int16Buffer.frameCapacity) else {
+        guard let floatBuffer = AVAudioPCMBuffer(pcmFormat: floatFormat, frameCapacity: int16Buffer.frameCapacity) else {
             return nil
         }
         
-        var error: NSError?
-        converter.convert(to: floatBuffer, error: &error) { _, outStatus in
-            outStatus.pointee = .haveData
-            return int16Buffer
-        }
+        floatBuffer.frameLength = frameCount
         
-        if let error = error {
-            print("❌ Conversion error: \(error)")
-            return nil
+        // Manual conversion with volume amplification (2.5x boost)
+        let volumeBoost: Float = 2.5
+        if let int16Data = int16Buffer.int16ChannelData?[0],
+           let floatData = floatBuffer.floatChannelData?[0] {
+            for i in 0..<Int(frameCount) {
+                let sample = Float(int16Data[i]) / 32768.0 * volumeBoost
+                // Clamp to prevent distortion
+                floatData[i] = max(-1.0, min(1.0, sample))
+            }
         }
         
         return floatBuffer
@@ -312,6 +327,11 @@ class AudioPlayerService: NSObject, ObservableObject {
             print("🔄 Audio engine not running, restarting...")
             prepareAndStartEngine()
         }
+        
+        // Ensure maximum volume
+        playerNode.volume = 1.0
+        mixerNode.outputVolume = 1.0
+        audioEngine.mainMixerNode.outputVolume = 1.0
         
         DispatchQueue.main.async {
             self.isPlaying = true
@@ -353,11 +373,14 @@ class AudioPlayerService: NSObject, ObservableObject {
         
         floatBuffer.frameLength = frameCount
         
-        // Manual conversion Int16 -> Float
+        // Manual conversion Int16 -> Float with volume boost (2.5x amplification)
+        let volumeBoost: Float = 2.5
         if let int16Data = buffer.int16ChannelData?[0],
            let floatData = floatBuffer.floatChannelData?[0] {
             for i in 0..<Int(frameCount) {
-                floatData[i] = Float(int16Data[i]) / 32768.0
+                let sample = Float(int16Data[i]) / 32768.0 * volumeBoost
+                // Clamp to prevent clipping
+                floatData[i] = max(-1.0, min(1.0, sample))
             }
         }
         
@@ -439,27 +462,54 @@ class AudioPlayerService: NSObject, ObservableObject {
     // MARK: - Text-to-Speech (Enhanced)
     
     func speak(_ text: String, rate: Float = 0.48, pitch: Float = 1.05, volume: Float = 1.0) {
+        print("🗣️ TTS speaking: \(text.prefix(50))...")
+        
         // Stop any current speech
         if synthesizer.isSpeaking {
             synthesizer.stopSpeaking(at: .immediate)
         }
         
-        configureAudioSession(forPlayback: true)
+        // Configure audio session on main thread
+        DispatchQueue.main.async {
+            do {
+                let session = AVAudioSession.sharedInstance()
+                try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers, .defaultToSpeaker])
+                try session.setActive(true, options: .notifyOthersOnDeactivation)
+                print("✅ Audio session configured for TTS")
+            } catch {
+                print("❌ Failed to configure audio session: \(error)")
+            }
+        }
         
         let utterance = AVSpeechUtterance(string: text)
         utterance.rate = rate
         utterance.pitchMultiplier = pitch
         utterance.volume = volume
-        utterance.preUtteranceDelay = 0.1
+        utterance.preUtteranceDelay = 0.2
         utterance.postUtteranceDelay = 0.1
         
-        // Use premium British voice if available
-        if let britishVoice = AVSpeechSynthesisVoice.speechVoices().first(where: {
+        // Try to find a good quality voice
+        let voices = AVSpeechSynthesisVoice.speechVoices()
+        
+        // Priority: Enhanced British female > Enhanced British > Premium British > Standard British
+        if let enhancedFemaleVoice = voices.first(where: {
+            $0.language == "en-GB" && $0.quality == .enhanced && $0.name.lowercased().contains("samantha")
+        }) {
+            utterance.voice = enhancedFemaleVoice
+            print("🎤 Using voice: \(enhancedFemaleVoice.name)")
+        } else if let enhancedVoice = voices.first(where: {
             $0.language == "en-GB" && $0.quality == .enhanced
         }) {
-            utterance.voice = britishVoice
+            utterance.voice = enhancedVoice
+            print("🎤 Using voice: \(enhancedVoice.name)")
+        } else if let premiumVoice = voices.first(where: {
+            $0.language == "en-GB" && $0.quality == .premium
+        }) {
+            utterance.voice = premiumVoice
+            print("🎤 Using voice: \(premiumVoice.name)")
         } else {
             utterance.voice = AVSpeechSynthesisVoice(language: "en-GB")
+            print("🎤 Using default en-GB voice")
         }
         
         currentUtterance = utterance
@@ -469,7 +519,11 @@ class AudioPlayerService: NSObject, ObservableObject {
             self.isPlaying = true
         }
         
-        synthesizer.speak(utterance)
+        // Small delay to ensure audio session is ready
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            self.synthesizer.speak(utterance)
+            print("✅ TTS started speaking")
+        }
         
         // Simulate audio levels during TTS
         startTTSLevelSimulation()

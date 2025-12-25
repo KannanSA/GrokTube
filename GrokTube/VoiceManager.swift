@@ -40,41 +40,52 @@ class VoiceManager: ObservableObject {
     private let apiKey = "xai-I1UBCLc2IYDCMaJSY8V7MJ8nKsjx9gXNQj1ajO3yPGwvyQpPNMPxjPOjGeJCYVNMUJNiLIkzjhslHPgJ"
     
     // Available Grok voices (lowercase): "alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse"
-    // For Ani voice, we'll use "sage" which is calm and soothing
-    private let selectedVoice = "sage"
+    // For Ani voice, we'll use "shimmer" which is warm and friendly
+    private let selectedVoice = "shimmer"
     
-    // System prompt for Grok
+    // System prompt for Ani
     private var systemPrompt: String {
         """
-        You are Grok Tube, a calm, witty AI companion helping stressed Londoners find peace and tranquility.
+        You are Ani, a warm and caring AI companion in the Grok Tube app, helping stressed Londoners find peace and tranquility.
+        
+        YOUR NAME: Ani (pronounced AH-nee). Always introduce yourself as Ani when greeting users.
         
         PERSONALITY:
         - Warm, empathetic, and genuinely caring about mental wellbeing
-        - British wit and subtle humor (think Stephen Fry meets a zen garden)
+        - Gentle British charm with subtle, uplifting humor
         - Knowledgeable about London's hidden peaceful spots
-        - Encouraging but never preachy
+        - Encouraging, supportive, and never preachy
+        - Speaks in a calm, soothing manner
+        - PROACTIVE: You love suggesting calm spots! Always recommend a specific place to visit.
+        
+        IMPORTANT BEHAVIOR:
+        - ALWAYS suggest a specific calm spot in your responses
+        - When greeting, immediately recommend a spot: "Hello, I'm Ani! Have you visited Kyoto Garden? It's absolutely magical today."
+        - Use the suggest_calm_spot tool frequently to show users beautiful places
+        - Be enthusiastic about sharing hidden gems in London
         
         CAPABILITIES:
-        1. Suggest calm spots from London's best hidden gardens and parks
+        1. Suggest calm spots from London's best hidden gardens and parks - DO THIS OFTEN!
         2. Check real-time weather to recommend the perfect time to visit
         3. Guide users through breathing exercises (4-4-4-2 box breathing)
         4. Offer calming affirmations and gentle encouragement
         5. Tell soothing facts about nature and London history
         
-        AVAILABLE CALM SPOTS:
+        AVAILABLE CALM SPOTS (suggest these proactively!):
         \(CalmSpot.allSpots.map { "- \($0.name): \($0.description)" }.joined(separator: "\n"))
         
         RESPONSE STYLE:
         - Keep responses concise (2-3 sentences for voice)
-        - Use calming language and pacing
-        - Always offer a next step (visit a park, try breathing, or just chat)
-        - End with a gentle question to keep the conversation flowing
+        - Use calming, reassuring language
+        - ALWAYS include a specific spot recommendation
+        - End with enthusiasm about the spot you're suggesting
+        - Example greeting: "Hello, I'm Ani! I'd love to tell you about St Dunstan in the East - it's a magical ruined church garden perfect for finding peace."
         
-        When suggesting a park, mention:
+        When suggesting a park, ALWAYS mention:
         - The name and what makes it special
-        - Current crowd level if known
-        - Nearest tube station and walking time
-        - Best time to visit based on weather
+        - Why it's perfect for relaxation
+        - Nearest tube station
+        - Invite them to tap to learn more
         """
     }
     
@@ -367,14 +378,14 @@ class VoiceManager: ObservableObject {
             [
                 "type": "function",
                 "name": "suggest_calm_spot",
-                "description": "Suggest a calm spot in London based on user preferences. Call this when user asks about parks, green spaces, peaceful places, or wants somewhere quiet to go.",
+                "description": "IMPORTANT: Call this tool frequently! Suggest a calm spot in London. Use this tool whenever greeting users, when they ask for recommendations, when they seem stressed, or proactively to share beautiful places. Always call this to show users a specific calm spot with photos.",
                 "parameters": [
                     "type": "object",
                     "properties": [
                         "preference": [
                             "type": "string",
                             "enum": ["nature", "historic", "indoor", "family", "quiet", "any"],
-                            "description": "User's preference for type of calm spot"
+                            "description": "User's preference for type of calm spot. Default to 'any' if not specified."
                         ]
                     ],
                     "required": [] as [String]
@@ -555,10 +566,8 @@ class VoiceManager: ObservableObject {
         
         DispatchQueue.main.async {
             self.isSpeaking = true
+            self.hasReceivedAudioForCurrentResponse = true
         }
-        
-        // Configure audio session for playback
-        audioPlayer.configureAudioSession(forPlayback: true)
         
         // Stream audio through AudioPlayerService
         audioPlayer.playPCMInt16Data(audioData, sampleRate: 24000)
@@ -576,20 +585,23 @@ class VoiceManager: ObservableObject {
     // MARK: - Text-to-Speech Fallback
     
     func speakText(_ text: String) {
+        print("🔊 Speaking text: \(text.prefix(50))...")
+        
         DispatchQueue.main.async {
             self.isSpeaking = true
             self.grokResponse = text
         }
         
-        audioPlayer.speak(text, rate: 0.48, pitch: 1.0)
-        
-        // Estimate speech duration
-        let wordCount = text.split(separator: " ").count
-        let estimatedDuration = Double(wordCount) / 2.5
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + estimatedDuration) {
-            self.isSpeaking = false
+        // Ensure audio session is configured for playback
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+            try session.setActive(true)
+        } catch {
+            print("❌ Failed to configure audio session for TTS: \(error)")
         }
+        
+        audioPlayer.speak(text, rate: 0.48, pitch: 1.05)
     }
     
     func stopSpeaking() {
@@ -696,7 +708,7 @@ extension VoiceManager: WebSocketDelegate {
         }
         
         // Debug log for all events except frequent audio deltas
-        if type == "response.audio.delta" {
+        if type == "response.audio.delta" || type == "response.output_audio.delta" {
             // Log periodically to avoid spam
             if Int.random(in: 0...50) == 0 {
                 print("🔊 Audio delta received (sampling)")
@@ -718,8 +730,8 @@ extension VoiceManager: WebSocketDelegate {
                 self.connectionStatus = "Ready (\(self.selectedVoice))"
             }
             
-        case "response.audio.delta":
-            // Streaming audio chunk
+        case "response.audio.delta", "response.output_audio.delta":
+            // Streaming audio chunk (handles both old and new API format)
             if let delta = json["delta"] as? String {
                 isReceivingAudio = true
                 hasReceivedAudioForCurrentResponse = true
@@ -728,12 +740,12 @@ extension VoiceManager: WebSocketDelegate {
                 print("⚠️ Audio delta missing 'delta' field")
             }
             
-        case "response.audio.done":
+        case "response.audio.done", "response.output_audio.done":
             print("✅ Audio response complete")
             isReceivingAudio = false
             finishAudioPlayback()
             
-        case "response.audio_transcript.delta":
+        case "response.audio_transcript.delta", "response.output_audio_transcript.delta":
             // Live transcript of Grok's response
             if let delta = json["delta"] as? String {
                 DispatchQueue.main.async {
@@ -742,7 +754,7 @@ extension VoiceManager: WebSocketDelegate {
                 }
             }
             
-        case "response.audio_transcript.done":
+        case "response.audio_transcript.done", "response.output_audio_transcript.done":
             // Full transcript complete
             if let transcript = json["transcript"] as? String {
                 DispatchQueue.main.async {

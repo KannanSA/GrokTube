@@ -35,6 +35,7 @@ struct ContentView: View {
         case home = "Home"
         case map = "Explore"
         case breathe = "Breathe"
+        case about = "About"
     }
     
     var body: some View {
@@ -86,6 +87,13 @@ struct ContentView: View {
                     Label("Breathe", systemImage: "wind")
                 }
                 .tag(AppTab.breathe)
+                
+                // About Tab
+                AboutView()
+                    .tabItem {
+                        Label("About", systemImage: "info.circle.fill")
+                    }
+                    .tag(AppTab.about)
             }
             .tint(.green)
         }
@@ -285,7 +293,7 @@ struct VoiceInterfaceCard: View {
             // Response text
             VStack(alignment: .leading, spacing: 8) {
                 if !voiceManager.grokResponse.isEmpty {
-                    Text("Grok says:")
+                    Text("Ani says:")
                         .font(.caption)
                         .foregroundColor(.secondary)
                     
@@ -308,7 +316,7 @@ struct VoiceInterfaceCard: View {
                 }
                 
                 if voiceManager.grokResponse.isEmpty && voiceManager.transcript.isEmpty {
-                    Text(voiceManager.isConnected ? "Ask me anything about London's calm spots..." : transcript)
+                    Text(voiceManager.isConnected ? "Hi, I'm Ani! Ask me about London's calm spots..." : transcript)
                         .font(.body)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
@@ -742,7 +750,10 @@ struct MapExploreView: View {
                 } onGetDirections: {
                     openDirections(to: spot)
                 } onShowFullDetail: {
-                    showSpotDetail = true
+                    // Ensure spot is still selected before showing detail
+                    if selectedSpot != nil {
+                        showSpotDetail = true
+                    }
                 }
                 .padding()
                 .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -1006,6 +1017,131 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         authorizationStatus = manager.authorizationStatus
+    }
+}
+
+// MARK: - About View
+struct AboutView: View {
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 30) {
+                    // App Logo/Header
+                    VStack(spacing: 16) {
+                        Image(systemName: "leaf.circle.fill")
+                            .font(.system(size: 80))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.green, .mint],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                        
+                        Text("GrokTube")
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+                        
+                        Text("Your Calm Companion in London")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.top, 40)
+                    
+                    // Developer Credit
+                    VStack(spacing: 12) {
+                        Text("Built with 💚 by")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                        
+                        Text("Kannan Sekar Annu Radha")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(16)
+                    .padding(.horizontal)
+                    
+                    // Links Section
+                    VStack(spacing: 16) {
+                        Text("Connect")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                        
+                        // Website Link
+                        Link(destination: URL(string: "https://www.sakannan.com")!) {
+                            HStack {
+                                Image(systemName: "globe")
+                                    .font(.title2)
+                                    .foregroundColor(.blue)
+                                
+                                VStack(alignment: .leading) {
+                                    Text("Website")
+                                        .font(.headline)
+                                        .foregroundColor(.primary)
+                                    Text("www.sakannan.com")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                }
+                                
+                                Spacer()
+                                
+                                Image(systemName: "arrow.up.right.square")
+                                    .foregroundColor(.blue)
+                            }
+                            .padding()
+                            .background(Color(.systemGray6))
+                            .cornerRadius(12)
+                        }
+                        
+                        // Twitter Link
+                        Link(destination: URL(string: "https://twitter.com/SAKannanAI")!) {
+                            HStack {
+                                Image(systemName: "at")
+                                    .font(.title2)
+                                    .foregroundColor(.blue)
+                                
+                                VStack(alignment: .leading) {
+                                    Text("Twitter / X")
+                                        .font(.headline)
+                                        .foregroundColor(.primary)
+                                    Text("@SAKannanAI")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                }
+                                
+                                Spacer()
+                                
+                                Image(systemName: "arrow.up.right.square")
+                                    .foregroundColor(.blue)
+                            }
+                            .padding()
+                            .background(Color(.systemGray6))
+                            .cornerRadius(12)
+                        }
+                    }
+                    .padding(.horizontal)
+                    
+                    // App Info
+                    VStack(spacing: 8) {
+                        Text("Version 1.0")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        Text("Powered by Ani 🤖")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.top, 20)
+                    
+                    Spacer(minLength: 50)
+                }
+            }
+            .navigationTitle("About")
+            .navigationBarTitleDisplayMode(.inline)
+        }
     }
 }
 
