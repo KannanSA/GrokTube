@@ -120,9 +120,24 @@ struct ContentView: View {
     }
     
     private func setupVoiceManagerCallbacks() {
+        // Handle tool calls
         voiceManager.onToolCallCallback = { toolName, args in
-            if toolName == "breathing" {
-                showBreathingExercise = true
+            print("🔧 Tool callback: \(toolName)")
+            if toolName == "breathing" || toolName == "start_breathing_exercise" {
+                DispatchQueue.main.async {
+                    showBreathingExercise = true
+                }
+            }
+        }
+        
+        // Handle spot suggestions from Grok
+        voiceManager.onSpotSuggested = { spot in
+            print("📍 Spot suggested callback: \(spot.name)")
+            DispatchQueue.main.async {
+                selectedSpot = spot
+                showSpotDetail = true
+                // Also switch to map tab to show the spot
+                selectedTab = .map
             }
         }
     }
@@ -193,6 +208,13 @@ struct HomeView: View {
                 .padding(.top)
             }
             .navigationBarHidden(true)
+        }
+        .sheet(isPresented: $showSpotDetail) {
+            if let spot = selectedSpot {
+                SpotDetailSheet(spot: spot, weather: weather)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+            }
         }
     }
 }
@@ -624,25 +646,32 @@ struct FeaturedSpotsCarousel: View {
 
 struct SpotCard: View {
     let spot: CalmSpot
+    @StateObject private var imageService = XImageService.shared
+    @State private var spotImage: XImageService.XImage?
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Image placeholder
+            // Image from X.com or fallback
             ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(
-                        LinearGradient(
-                            colors: [.green.opacity(0.6), .mint.opacity(0.4)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+                if let image = spotImage {
+                    XImageView(imageURL: image.url, author: image.author, showAttribution: false)
+                } else {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(
+                            LinearGradient(
+                                colors: [.green.opacity(0.6), .mint.opacity(0.4)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
                         )
-                    )
-                
-                Image(systemName: spot.systemImage)
-                    .font(.system(size: 40))
-                    .foregroundColor(.white.opacity(0.8))
+                    
+                    Image(systemName: spot.systemImage)
+                        .font(.system(size: 40))
+                        .foregroundColor(.white.opacity(0.8))
+                }
             }
             .frame(width: 160, height: 100)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(spot.name)
@@ -676,6 +705,12 @@ struct SpotCard: View {
         .frame(width: 160)
         .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
+        .task {
+            let images = await imageService.fetchImages(for: spot.name)
+            if let first = images.first {
+                spotImage = first
+            }
+        }
     }
     
     private var crowdColor: Color {
@@ -742,21 +777,9 @@ struct SpotDetailSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
-                    // Hero image placeholder
-                    ZStack {
-                        LinearGradient(
-                            colors: [.green.opacity(0.7), .mint.opacity(0.5)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                        
-                        Image(systemName: spot.systemImage)
-                            .font(.system(size: 80))
-                            .foregroundColor(.white.opacity(0.5))
-                    }
-                    .frame(height: 200)
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
-                    .padding(.horizontal)
+                    // Image carousel from X.com
+                    SpotImageCarousel(spotName: spot.name)
+                        .padding(.horizontal)
                     
                     // Info
                     VStack(alignment: .leading, spacing: 16) {

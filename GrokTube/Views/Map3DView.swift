@@ -426,37 +426,52 @@ struct TubeStation3DMarkerView: View {
     let isNearSelected: Bool
     
     var body: some View {
-        ZStack {
-            // London Underground roundel
-            Circle()
-                .fill(Color.red)
-                .frame(width: isNearSelected ? 32 : 24, height: isNearSelected ? 32 : 24)
-                .shadow(color: .red.opacity(0.4), radius: isNearSelected ? 8 : 4)
-            
-            // White bar
-            RoundedRectangle(cornerRadius: 2)
-                .fill(Color.white)
-                .frame(width: isNearSelected ? 28 : 20, height: isNearSelected ? 10 : 7)
-            
-            // Station initial or icon
-            if isNearSelected {
-                Text(String(station.name.prefix(1)))
-                    .font(.system(size: 8, weight: .black))
-                    .foregroundColor(.blue)
-            }
-        }
-        .overlay(
-            // Tube lines indicator
-            HStack(spacing: 2) {
-                ForEach(station.lines.prefix(3), id: \.self) { line in
-                    Circle()
-                        .fill(Color(hex: line.color))
-                        .frame(width: 6, height: 6)
+        VStack(spacing: 4) {
+            ZStack {
+                // London Underground roundel
+                Circle()
+                    .fill(Color.red)
+                    .frame(width: isNearSelected ? 32 : 24, height: isNearSelected ? 32 : 24)
+                    .shadow(color: .red.opacity(0.4), radius: isNearSelected ? 8 : 4)
+                
+                // White bar
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color.white)
+                    .frame(width: isNearSelected ? 28 : 20, height: isNearSelected ? 10 : 7)
+                
+                // Station initial or icon
+                if isNearSelected {
+                    Text(String(station.name.prefix(1)))
+                        .font(.system(size: 8, weight: .black))
+                        .foregroundColor(.blue)
                 }
             }
-            .offset(y: isNearSelected ? 22 : 16)
-            , alignment: .bottom
-        )
+            .overlay(
+                // Tube lines indicator
+                HStack(spacing: 2) {
+                    ForEach(station.lines.prefix(3), id: \.self) { line in
+                        Circle()
+                            .fill(Color(hex: line.color))
+                            .frame(width: 6, height: 6)
+                    }
+                }
+                .offset(y: isNearSelected ? 22 : 16)
+                , alignment: .bottom
+            )
+            
+            // Station name label
+            Text(station.name)
+                .font(.system(size: isNearSelected ? 10 : 8, weight: .semibold))
+                .foregroundColor(.primary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(
+                    Capsule()
+                        .fill(Color(.systemBackground).opacity(0.9))
+                        .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
+                )
+                .offset(y: isNearSelected ? 8 : 4)
+        }
         .scaleEffect(isNearSelected ? 1.1 : 1.0)
         .animation(.spring(response: 0.3), value: isNearSelected)
     }
@@ -513,25 +528,29 @@ struct SpotDetailCard: View {
     var onShowFullDetail: (() -> Void)? = nil
     
     @State private var showingFullDescription = false
+    @StateObject private var imageService = XImageService.shared
+    @State private var spotImage: XImageService.XImage?
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header with image
+            // Header with image from X.com
             ZStack(alignment: .topTrailing) {
-                // Gradient background with icon
-                LinearGradient(
-                    colors: [.green.opacity(0.8), .mint.opacity(0.6)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .frame(height: 120)
-                .overlay {
-                    Image(systemName: spot.systemImage)
-                        .font(.system(size: 60))
-                        .foregroundColor(.white.opacity(0.3))
-                }
-                .onTapGesture {
-                    onShowFullDetail?()
+                // Image or gradient fallback
+                if let image = spotImage {
+                    XImageView(imageURL: image.url, author: image.author, showAttribution: true)
+                        .frame(height: 120)
+                } else {
+                    LinearGradient(
+                        colors: [.green.opacity(0.8), .mint.opacity(0.6)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .frame(height: 120)
+                    .overlay {
+                        Image(systemName: spot.systemImage)
+                            .font(.system(size: 60))
+                            .foregroundColor(.white.opacity(0.3))
+                    }
                 }
                 
                 // Close button
@@ -539,8 +558,12 @@ struct SpotDetailCard: View {
                     Image(systemName: "xmark.circle.fill")
                         .font(.title2)
                         .foregroundColor(.white)
+                        .shadow(radius: 2)
                         .padding(8)
                 }
+            }
+            .onTapGesture {
+                onShowFullDetail?()
             }
             
             // Content
@@ -678,6 +701,12 @@ struct SpotDetailCard: View {
         .background(Color(.systemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 10)
+        .task {
+            let images = await imageService.fetchImages(for: spot.name)
+            if let first = images.first {
+                spotImage = first
+            }
+        }
     }
     
     private var crowdColor: Color {

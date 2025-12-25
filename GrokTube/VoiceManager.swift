@@ -27,6 +27,7 @@ class VoiceManager: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var onResponseCallback: ((String) -> Void)?
     var onToolCallCallback: ((String, [String: Any]) -> Void)?
+    var onSpotSuggested: ((CalmSpot) -> Void)?
     
     // Audio player service for voice responses
     private let audioPlayer = AudioPlayerService.shared
@@ -37,8 +38,9 @@ class VoiceManager: ObservableObject {
     
     private let apiKey = "xai-I1UBCLc2IYDCMaJSY8V7MJ8nKsjx9gXNQj1ajO3yPGwvyQpPNMPxjPOjGeJCYVNMUJNiLIkzjhslHPgJ"
     
-    // Available Grok voices: "Cove", "Celeste", "Ava", "Sage", "Ash", "Nova", "Orbit", "Eclipse", "Ani"
-    private let selectedVoice = "Ani" // Ani companion voice
+    // Available Grok voices (lowercase): "alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse"
+    // For Ani voice, we'll use "sage" which is calm and soothing
+    private let selectedVoice = "sage"
     
     // System prompt for Grok
     private var systemPrompt: String {
@@ -328,16 +330,21 @@ class VoiceManager: ObservableObject {
         if let jsonData = try? JSONSerialization.data(withJSONObject: userMessage),
            let jsonString = String(data: jsonData, encoding: .utf8) {
             socket?.write(string: jsonString)
+            print("📤 Sent user message: \(text)")
         }
         
-        // Request response
+        // Request response with audio modality
         let responseRequest: [String: Any] = [
-            "type": "response.create"
+            "type": "response.create",
+            "response": [
+                "modalities": ["text", "audio"]
+            ]
         ]
         
         if let jsonData = try? JSONSerialization.data(withJSONObject: responseRequest),
            let jsonString = String(data: jsonData, encoding: .utf8) {
             socket?.write(string: jsonString)
+            print("📤 Requested response with audio")
         }
     }
     
@@ -358,13 +365,14 @@ class VoiceManager: ObservableObject {
             [
                 "type": "function",
                 "name": "suggest_calm_spot",
-                "description": "Suggest a calm spot in London based on user preferences and current conditions",
+                "description": "Suggest a calm spot in London based on user preferences. Call this when user asks about parks, green spaces, peaceful places, or wants somewhere quiet to go.",
                 "parameters": [
                     "type": "object",
                     "properties": [
                         "preference": [
                             "type": "string",
-                            "description": "User's preference: nature, historic, indoor, family-friendly"
+                            "enum": ["nature", "historic", "indoor", "family", "quiet", "any"],
+                            "description": "User's preference for type of calm spot"
                         ]
                     ],
                     "required": [] as [String]
@@ -373,7 +381,7 @@ class VoiceManager: ObservableObject {
             [
                 "type": "function",
                 "name": "start_breathing_exercise",
-                "description": "Start a guided breathing exercise for stress relief",
+                "description": "Start a guided breathing exercise for stress relief. Call this when user mentions stress, anxiety, needing to calm down, or wants a breathing exercise.",
                 "parameters": [
                     "type": "object",
                     "properties": [
@@ -411,7 +419,8 @@ class VoiceManager: ObservableObject {
         
         if let jsonData = try? JSONSerialization.data(withJSONObject: config),
            let jsonString = String(data: jsonData, encoding: .utf8) {
-            print("📤 Sending session config")
+            print("📤 Sending session config with voice: \(selectedVoice)")
+            print("📤 Config: \(jsonString.prefix(500))...")
             socket?.write(string: jsonString)
         }
     }
@@ -419,6 +428,8 @@ class VoiceManager: ObservableObject {
     // MARK: - Tool Handling
     
     func handleToolCall(name: String, arguments: [String: Any], callId: String) {
+        print("🔧 Handling tool call: \(name) with args: \(arguments)")
+        
         Task {
             var result: String = ""
             
@@ -432,12 +443,13 @@ class VoiceManager: ObservableObject {
                 
             case "start_breathing_exercise":
                 let cycles = arguments["duration"] as? Int ?? 4
-                result = "Starting \(cycles)-cycle breathing exercise. Follow along..."
+                result = "Starting \(cycles)-cycle breathing exercise. Take a deep breath and follow along. Inhale through your nose for 4 seconds, hold for 4 seconds, then exhale slowly for 6 seconds."
                 DispatchQueue.main.async {
-                    self.onToolCallCallback?("breathing", ["cycles": cycles])
+                    self.onToolCallCallback?("start_breathing_exercise", ["cycles": cycles])
                 }
                 
             default:
+                print("⚠️ Unknown tool: \(name)")
                 result = "Tool not recognized"
             }
             
@@ -474,8 +486,10 @@ class VoiceManager: ObservableObject {
             filtered = spots.filter { $0.tags.contains("Indoor") }
         case "family":
             filtered = spots.filter { $0.tags.contains("Family") }
-        default:
+        case "quiet":
             filtered = spots.filter { $0.crowdLevel == .quiet }
+        default:
+            filtered = spots
         }
         
         guard let spot = filtered.randomElement() ?? spots.randomElement() else {
@@ -484,6 +498,9 @@ class VoiceManager: ObservableObject {
         
         DispatchQueue.main.async {
             self.suggestedSpot = spot
+            // Call the callback to notify ContentView
+            self.onSpotSuggested?(spot)
+            print("✅ Spot suggested: \(spot.name)")
         }
         
         return """
@@ -507,13 +524,20 @@ class VoiceManager: ObservableObject {
         if let jsonData = try? JSONSerialization.data(withJSONObject: response),
            let jsonString = String(data: jsonData, encoding: .utf8) {
             socket?.write(string: jsonString)
+            print("📤 Sent tool result for call: \(callId)")
         }
         
-        // Trigger response generation
-        let generate: [String: Any] = ["type": "response.create"]
+        // Trigger response generation with audio modality
+        let generate: [String: Any] = [
+            "type": "response.create",
+            "response": [
+                "modalities": ["text", "audio"]
+            ]
+        ]
         if let genData = try? JSONSerialization.data(withJSONObject: generate),
            let genString = String(data: genData, encoding: .utf8) {
             socket?.write(string: genString)
+            print("📤 Requested response with audio after tool result")
         }
     }
     
@@ -521,13 +545,18 @@ class VoiceManager: ObservableObject {
     
     func playAudioResponse(_ base64Audio: String) {
         guard let audioData = Data(base64Encoded: base64Audio) else {
-            print("❌ Failed to decode audio data")
+            print("❌ Failed to decode base64 audio data (length: \(base64Audio.count))")
             return
         }
+        
+        print("🔊 Playing audio chunk: \(audioData.count) bytes")
         
         DispatchQueue.main.async {
             self.isSpeaking = true
         }
+        
+        // Configure audio session for playback
+        audioPlayer.configureAudioSession(forPlayback: true)
         
         // Stream audio through AudioPlayerService
         audioPlayer.playPCMInt16Data(audioData, sampleRate: 24000)
@@ -659,11 +688,19 @@ extension VoiceManager: WebSocketDelegate {
     private func handleTextMessage(_ text: String) {
         guard let data = text.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let type = json["type"] as? String else { return }
+              let type = json["type"] as? String else { 
+            print("⚠️ Failed to parse WebSocket message")
+            return 
+        }
         
-        // Debug log for important events
-        if !["response.audio.delta"].contains(type) {
-            print("📨 Received: \(type)")
+        // Debug log for all events except frequent audio deltas
+        if type == "response.audio.delta" {
+            // Log periodically to avoid spam
+            if Int.random(in: 0...50) == 0 {
+                print("🔊 Audio delta received (sampling)")
+            }
+        } else {
+            print("📨 Received event: \(type)")
         }
         
         switch type {
@@ -684,6 +721,8 @@ extension VoiceManager: WebSocketDelegate {
             if let delta = json["delta"] as? String {
                 isReceivingAudio = true
                 playAudioResponse(delta)
+            } else {
+                print("⚠️ Audio delta missing 'delta' field")
             }
             
         case "response.audio.done":
