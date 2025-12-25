@@ -35,6 +35,7 @@ class VoiceManager: ObservableObject {
     // Accumulated audio buffer for streaming response
     private var audioBuffer = Data()
     private var isReceivingAudio = false
+    private var hasReceivedAudioForCurrentResponse = false
     
     private let apiKey = "xai-I1UBCLc2IYDCMaJSY8V7MJ8nKsjx9gXNQj1ajO3yPGwvyQpPNMPxjPOjGeJCYVNMUJNiLIkzjhslHPgJ"
     
@@ -310,6 +311,7 @@ class VoiceManager: ObservableObject {
             self.transcript = text
             self.grokResponse = ""
             self.isProcessing = true
+            self.hasReceivedAudioForCurrentResponse = false
         }
         
         // Create conversation item with user message
@@ -720,6 +722,7 @@ extension VoiceManager: WebSocketDelegate {
             // Streaming audio chunk
             if let delta = json["delta"] as? String {
                 isReceivingAudio = true
+                hasReceivedAudioForCurrentResponse = true
                 playAudioResponse(delta)
             } else {
                 print("⚠️ Audio delta missing 'delta' field")
@@ -769,6 +772,15 @@ extension VoiceManager: WebSocketDelegate {
             print("✅ Response complete")
             DispatchQueue.main.async {
                 self.isProcessing = false
+                
+                // If we got text but no audio, use text-to-speech as fallback
+                if !self.hasReceivedAudioForCurrentResponse && !self.grokResponse.isEmpty {
+                    print("🔊 No audio received, falling back to TTS for: \(self.grokResponse.prefix(50))...")
+                    self.speakText(self.grokResponse)
+                }
+                
+                // Reset for next response
+                self.hasReceivedAudioForCurrentResponse = false
             }
             
         case "input_audio_buffer.speech_started":
@@ -776,6 +788,7 @@ extension VoiceManager: WebSocketDelegate {
             DispatchQueue.main.async {
                 self.isProcessing = true
                 self.grokResponse = ""
+                self.hasReceivedAudioForCurrentResponse = false
             }
             
         case "input_audio_buffer.speech_stopped":

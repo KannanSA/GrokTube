@@ -209,13 +209,6 @@ struct HomeView: View {
             }
             .navigationBarHidden(true)
         }
-        .sheet(isPresented: $showSpotDetail) {
-            if let spot = selectedSpot {
-                SpotDetailSheet(spot: spot, weather: weather)
-                    .presentationDetents([.medium, .large])
-                    .presentationDragIndicator(.visible)
-            }
-        }
     }
 }
 
@@ -777,8 +770,8 @@ struct SpotDetailSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
-                    // Image carousel from X.com
-                    SpotImageCarousel(spotName: spot.name)
+                    // Live feed from X.com (photos and tweets)
+                    SpotLiveFeedView(spotName: spot.name)
                         .padding(.horizontal)
                     
                     // Info

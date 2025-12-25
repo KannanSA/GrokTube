@@ -82,9 +82,15 @@ class AudioPlayerService: NSObject, ObservableObject {
     }
     
     private func prepareAndStartEngine() {
-        audioEngine.prepare()
         do {
+            // Configure audio session first
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+            try session.setActive(true)
+            
+            audioEngine.prepare()
             try audioEngine.start()
+            print("✅ Audio engine started successfully")
         } catch {
             print("❌ Audio engine failed to start: \(error)")
         }
@@ -92,6 +98,7 @@ class AudioPlayerService: NSObject, ObservableObject {
     
     private func restartEngineIfNeeded() {
         if !audioEngine.isRunning {
+            print("🔄 Restarting audio engine...")
             prepareAndStartEngine()
         }
     }
@@ -199,13 +206,30 @@ class AudioPlayerService: NSObject, ObservableObject {
     
     /// Play raw PCM audio data received from WebSocket (Int16 format)
     func playPCMInt16Data(_ data: Data, sampleRate: Double = 24000) {
+        // Ensure audio session is configured on main thread first
+        DispatchQueue.main.async {
+            self.configureAudioSession(forPlayback: true)
+        }
+        
         audioQueue.async { [weak self] in
-            guard let self = self, data.count > 0 else { return }
+            guard let self = self, data.count > 0 else { 
+                print("⚠️ Empty audio data received")
+                return 
+            }
             
             self.restartEngineIfNeeded()
             
-            let format = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: sampleRate, channels: 1, interleaved: false)!
+            guard let format = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: sampleRate, channels: 1, interleaved: false) else {
+                print("❌ Failed to create Int16 audio format")
+                return
+            }
+            
             let frameCount = UInt32(data.count / MemoryLayout<Int16>.size)
+            
+            guard frameCount > 0 else {
+                print("⚠️ Frame count is 0")
+                return
+            }
             
             guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount) else {
                 print("❌ Failed to create Int16 buffer")
@@ -223,7 +247,9 @@ class AudioPlayerService: NSObject, ObservableObject {
             
             // Convert to float format for playback
             guard let floatBuffer = self.convertInt16ToFloat(buffer) else {
-                print("❌ Failed to convert buffer")
+                print("❌ Failed to convert buffer to float")
+                // Try direct Int16 playback as fallback
+                self.scheduleInt16Buffer(buffer)
                 return
             }
             
@@ -281,8 +307,21 @@ class AudioPlayerService: NSObject, ObservableObject {
     }
     
     private func scheduleBuffer(_ buffer: AVAudioPCMBuffer) {
+        // Ensure engine is running
+        if !audioEngine.isRunning {
+            print("🔄 Audio engine not running, restarting...")
+            prepareAndStartEngine()
+        }
+        
         DispatchQueue.main.async {
             self.isPlaying = true
+            self.isSpeaking = true
+        }
+        
+        // Start player node first if not playing
+        if !playerNode.isPlaying {
+            playerNode.play()
+            print("▶️ Player node started")
         }
         
         playerNode.scheduleBuffer(buffer) { [weak self] in
@@ -295,15 +334,34 @@ class AudioPlayerService: NSObject, ObservableObject {
                 if self.pendingBuffers.isEmpty && !self.isStreamingActive {
                     DispatchQueue.main.async {
                         self.isPlaying = false
+                        self.isSpeaking = false
                         self.onPlaybackComplete?()
                     }
                 }
             }
         }
-        
-        if !playerNode.isPlaying {
-            playerNode.play()
+    }
+    
+    private func scheduleInt16Buffer(_ buffer: AVAudioPCMBuffer) {
+        // Fallback for direct Int16 playback - convert manually
+        let frameCount = buffer.frameLength
+        guard let floatFormat = AVAudioFormat(standardFormatWithSampleRate: buffer.format.sampleRate, channels: 1),
+              let floatBuffer = AVAudioPCMBuffer(pcmFormat: floatFormat, frameCapacity: frameCount) else {
+            print("❌ Could not create float buffer for fallback")
+            return
         }
+        
+        floatBuffer.frameLength = frameCount
+        
+        // Manual conversion Int16 -> Float
+        if let int16Data = buffer.int16ChannelData?[0],
+           let floatData = floatBuffer.floatChannelData?[0] {
+            for i in 0..<Int(frameCount) {
+                floatData[i] = Float(int16Data[i]) / 32768.0
+            }
+        }
+        
+        scheduleBuffer(floatBuffer)
     }
     
     /// Play base64 encoded audio
