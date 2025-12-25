@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		732A23BA2EFDA17000D442A6 /* groktube.png in Resources */ = {isa = PBXBuildFile; fileRef = 732A23AE2EFDA17000D442A6 /* groktube.png */; };
+		732A23BB2EFDA17000D442A6 /* appstore.png in Resources */ = {isa = PBXBuildFile; fileRef = 732A23B72EFDA17000D442A6 /* appstore.png */; };
+		732A23BC2EFDA17000D442A6 /* playstore.png in Resources */ = {isa = PBXBuildFile; fileRef = 732A23B92EFDA17000D442A6 /* playstore.png */; };
+		732A23C12EFDA17000D442A6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 732A23B82EFDA17000D442A6 /* Assets.xcassets */; };
 		73B4CE442EFD760300D8A891 /* Starscream in Frameworks */ = {isa = PBXBuildFile; productRef = 73B4CE432EFD760300D8A891 /* Starscream */; };
 /* End PBXBuildFile section */
 
@@ -28,6 +32,14 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		732A23AC2EFDA17000D442A6 /* groktube.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = groktube.png; sourceTree = "<group>"; };
+		732A23AE2EFDA17000D442A6 /* groktube.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = groktube.png; sourceTree = "<group>"; };
+		732A23B02EFDA17000D442A6 /* groktube.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = groktube.png; sourceTree = "<group>"; };
+		732A23B22EFDA17000D442A6 /* groktube.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = groktube.png; sourceTree = "<group>"; };
+		732A23B42EFDA17000D442A6 /* groktube.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = groktube.png; sourceTree = "<group>"; };
+		732A23B72EFDA17000D442A6 /* appstore.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = appstore.png; sourceTree = "<group>"; };
+		732A23B82EFDA17000D442A6 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		732A23B92EFDA17000D442A6 /* playstore.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = playstore.png; sourceTree = "<group>"; };
 		73B4CE132EFD719900D8A891 /* GrokTube.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GrokTube.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		73B4CE242EFD719F00D8A891 /* GrokTubeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GrokTubeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		73B4CE2E2EFD719F00D8A891 /* GrokTubeUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GrokTubeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -90,6 +102,58 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		732A23AD2EFDA17000D442A6 /* mipmap-hdpi */ = {
+			isa = PBXGroup;
+			children = (
+				732A23AC2EFDA17000D442A6 /* groktube.png */,
+			);
+			path = "mipmap-hdpi";
+			sourceTree = "<group>";
+		};
+		732A23AF2EFDA17000D442A6 /* mipmap-mdpi */ = {
+			isa = PBXGroup;
+			children = (
+				732A23AE2EFDA17000D442A6 /* groktube.png */,
+			);
+			path = "mipmap-mdpi";
+			sourceTree = "<group>";
+		};
+		732A23B12EFDA17000D442A6 /* mipmap-xhdpi */ = {
+			isa = PBXGroup;
+			children = (
+				732A23B02EFDA17000D442A6 /* groktube.png */,
+			);
+			path = "mipmap-xhdpi";
+			sourceTree = "<group>";
+		};
+		732A23B32EFDA17000D442A6 /* mipmap-xxhdpi */ = {
+			isa = PBXGroup;
+			children = (
+				732A23B22EFDA17000D442A6 /* groktube.png */,
+			);
+			path = "mipmap-xxhdpi";
+			sourceTree = "<group>";
+		};
+		732A23B52EFDA17000D442A6 /* mipmap-xxxhdpi */ = {
+			isa = PBXGroup;
+			children = (
+				732A23B42EFDA17000D442A6 /* groktube.png */,
+			);
+			path = "mipmap-xxxhdpi";
+			sourceTree = "<group>";
+		};
+		732A23B62EFDA17000D442A6 /* android */ = {
+			isa = PBXGroup;
+			children = (
+				732A23AD2EFDA17000D442A6 /* mipmap-hdpi */,
+				732A23AF2EFDA17000D442A6 /* mipmap-mdpi */,
+				732A23B12EFDA17000D442A6 /* mipmap-xhdpi */,
+				732A23B32EFDA17000D442A6 /* mipmap-xxhdpi */,
+				732A23B52EFDA17000D442A6 /* mipmap-xxxhdpi */,
+			);
+			path = android;
+			sourceTree = "<group>";
+		};
 		73B4CE0A2EFD719900D8A891 = {
 			isa = PBXGroup;
 			children = (
@@ -97,6 +161,10 @@
 				73B4CE272EFD719F00D8A891 /* GrokTubeTests */,
 				73B4CE312EFD719F00D8A891 /* GrokTubeUITests */,
 				73B4CE142EFD719900D8A891 /* Products */,
+				732A23B62EFDA17000D442A6 /* android */,
+				732A23B72EFDA17000D442A6 /* appstore.png */,
+				732A23B82EFDA17000D442A6 /* Assets.xcassets */,
+				732A23B92EFDA17000D442A6 /* playstore.png */,
 			);
 			sourceTree = "<group>";
 		};
@@ -234,6 +302,10 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				732A23BA2EFDA17000D442A6 /* groktube.png in Resources */,
+				732A23BB2EFDA17000D442A6 /* appstore.png in Resources */,
+				732A23BC2EFDA17000D442A6 /* playstore.png in Resources */,
+				732A23C12EFDA17000D442A6 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

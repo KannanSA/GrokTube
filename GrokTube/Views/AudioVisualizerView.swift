@@ -6,35 +6,32 @@
 //
 
 import SwiftUI
+import Combine
 
-/// Animated audio visualizer for voice responses
+/// Enhanced animated audio visualizer that responds to real audio levels
 struct AudioVisualizerView: View {
     @Binding var isPlaying: Bool
-    @State private var amplitudes: [CGFloat] = Array(repeating: 0.2, count: 30)
+    var audioLevels: [Float]? = nil // Real audio levels from AudioPlayerService
+    
+    @State private var amplitudes: [CGFloat] = Array(repeating: 0.15, count: 30)
     @State private var timer: Timer?
+    @StateObject private var audioService = AudioPlayerService.shared
     
     let barCount = 30
-    let barSpacing: CGFloat = 3
-    let minHeight: CGFloat = 4
+    let barSpacing: CGFloat = 2
+    let minHeight: CGFloat = 3
     let maxHeight: CGFloat = 50
     
     var body: some View {
         HStack(spacing: barSpacing) {
             ForEach(0..<barCount, id: \.self) { index in
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(
-                        LinearGradient(
-                            colors: [.green, .mint],
-                            startPoint: .bottom,
-                            endPoint: .top
-                        )
-                    )
-                    .frame(width: 4, height: minHeight + (maxHeight - minHeight) * amplitudes[index])
-                    .animation(
-                        .spring(response: 0.3, dampingFraction: 0.5)
-                        .delay(Double(index) * 0.02),
-                        value: amplitudes[index]
-                    )
+                AudioBar(
+                    amplitude: amplitudes[index],
+                    index: index,
+                    isPlaying: isPlaying,
+                    minHeight: minHeight,
+                    maxHeight: maxHeight
+                )
             }
         }
         .frame(height: maxHeight)
@@ -45,16 +42,39 @@ struct AudioVisualizerView: View {
                 stopAnimation()
             }
         }
+        .onReceive(audioService.$audioLevels) { levels in
+            if isPlaying && !levels.isEmpty {
+                updateFromRealLevels(levels)
+            }
+        }
+        .onAppear {
+            if isPlaying {
+                startAnimation()
+            }
+        }
         .onDisappear {
             stopAnimation()
         }
     }
     
+    private func updateFromRealLevels(_ levels: [Float]) {
+        withAnimation(.linear(duration: 0.05)) {
+            for i in 0..<min(barCount, levels.count) {
+                amplitudes[i] = CGFloat(levels[i])
+            }
+        }
+    }
+    
     private func startAnimation() {
-        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
-            withAnimation {
+        timer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { _ in
+            withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+                // Generate smooth wave-like pattern
+                let basePhase = Date().timeIntervalSince1970 * 8
                 for i in 0..<barCount {
-                    amplitudes[i] = CGFloat.random(in: 0.1...1.0)
+                    let wave1 = sin(basePhase + Double(i) * 0.3) * 0.3
+                    let wave2 = sin(basePhase * 1.5 + Double(i) * 0.5) * 0.2
+                    let random = Double.random(in: -0.1...0.1)
+                    amplitudes[i] = CGFloat(max(0.1, min(1.0, 0.4 + wave1 + wave2 + random)))
                 }
             }
         }
@@ -63,8 +83,85 @@ struct AudioVisualizerView: View {
     private func stopAnimation() {
         timer?.invalidate()
         timer = nil
-        withAnimation(.easeOut(duration: 0.3)) {
-            amplitudes = Array(repeating: 0.2, count: barCount)
+        withAnimation(.easeOut(duration: 0.4)) {
+            amplitudes = Array(repeating: 0.15, count: barCount)
+        }
+    }
+}
+
+/// Individual audio bar with gradient and glow
+struct AudioBar: View {
+    let amplitude: CGFloat
+    let index: Int
+    let isPlaying: Bool
+    let minHeight: CGFloat
+    let maxHeight: CGFloat
+    
+    var body: some View {
+        RoundedRectangle(cornerRadius: 2)
+            .fill(
+                LinearGradient(
+                    colors: barColors,
+                    startPoint: .bottom,
+                    endPoint: .top
+                )
+            )
+            .frame(width: 4, height: minHeight + (maxHeight - minHeight) * amplitude)
+            .shadow(color: shadowColor, radius: amplitude > 0.6 ? 4 : 0)
+            .animation(
+                .spring(response: 0.25, dampingFraction: 0.55)
+                .delay(Double(index) * 0.01),
+                value: amplitude
+            )
+    }
+    
+    private var barColors: [Color] {
+        if amplitude > 0.7 {
+            return [.orange, .yellow]
+        } else if amplitude > 0.4 {
+            return [.green, .mint]
+        } else {
+            return [.green.opacity(0.7), .mint.opacity(0.5)]
+        }
+    }
+    
+    private var shadowColor: Color {
+        if amplitude > 0.7 {
+            return .orange.opacity(0.6)
+        } else {
+            return .green.opacity(0.4)
+        }
+    }
+}
+
+/// Compact audio level indicator
+struct AudioLevelIndicator: View {
+    @ObservedObject var audioService = AudioPlayerService.shared
+    let isActive: Bool
+    
+    var body: some View {
+        HStack(spacing: 3) {
+            ForEach(0..<5, id: \.self) { index in
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(barColor(for: index))
+                    .frame(width: 3, height: 4 + CGFloat(index) * 4)
+                    .opacity(shouldShow(index) ? 1.0 : 0.3)
+            }
+        }
+        .animation(.easeOut(duration: 0.1), value: audioService.audioLevel)
+    }
+    
+    private func shouldShow(_ index: Int) -> Bool {
+        guard isActive else { return false }
+        let threshold = Float(index) / 5.0
+        return audioService.audioLevel >= threshold
+    }
+    
+    private func barColor(for index: Int) -> Color {
+        switch index {
+        case 0, 1: return .green
+        case 2, 3: return .yellow
+        default: return .red
         }
     }
 }
@@ -78,6 +175,21 @@ struct CircularWaveformView: View {
     
     var body: some View {
         ZStack {
+            // Outer glow when recording
+            if isRecording {
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [.red.opacity(0.3), .clear],
+                            center: .center,
+                            startRadius: 30,
+                            endRadius: 60
+                        )
+                    )
+                    .frame(width: 120, height: 120)
+                    .blur(radius: 10)
+            }
+            
             // Multiple wave circles
             ForEach(0..<3) { ring in
                 WaveCircle(
@@ -88,23 +200,28 @@ struct CircularWaveformView: View {
                 .stroke(
                     LinearGradient(
                         colors: [
-                            .blue.opacity(1.0 - Double(ring) * 0.3),
-                            .purple.opacity(0.8 - Double(ring) * 0.2)
+                            ringColor(ring).opacity(1.0 - Double(ring) * 0.3),
+                            ringColor(ring).opacity(0.6 - Double(ring) * 0.15)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),
-                    lineWidth: 3 - CGFloat(ring) * 0.5
+                    lineWidth: isRecording ? 3 - CGFloat(ring) * 0.5 : 2
                 )
                 .frame(width: 100 - CGFloat(ring * 15), height: 100 - CGFloat(ring * 15))
             }
             
             // Center mic icon
-            Image(systemName: isRecording ? "mic.fill" : "mic")
-                .font(.system(size: 30))
-                .foregroundColor(isRecording ? .red : .blue)
-                .scaleEffect(isRecording ? 1.1 : 1.0)
-                .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: isRecording)
+            ZStack {
+                Circle()
+                    .fill(isRecording ? Color.red.opacity(0.15) : Color.blue.opacity(0.1))
+                    .frame(width: 50, height: 50)
+                
+                Image(systemName: isRecording ? "mic.fill" : "mic")
+                    .font(.system(size: 24, weight: .medium))
+                    .foregroundColor(isRecording ? .red : .blue)
+                    .scaleEffect(isRecording ? 1.1 : 1.0)
+            }
         }
         .onChange(of: isRecording) { _, recording in
             if recording {
@@ -118,11 +235,21 @@ struct CircularWaveformView: View {
         }
     }
     
+    private func ringColor(_ ring: Int) -> Color {
+        if isRecording {
+            return ring == 0 ? .red : .orange
+        }
+        return .blue
+    }
+    
     private func startAnimation() {
-        timer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { _ in
-            withAnimation(.linear(duration: 0.05)) {
-                wavePhase += 0.15
-                amplitude = Double.random(in: 0.2...0.5)
+        timer = Timer.scheduledTimer(withTimeInterval: 0.04, repeats: true) { _ in
+            withAnimation(.linear(duration: 0.04)) {
+                wavePhase += 0.12
+                // Simulate voice amplitude variation
+                let baseAmplitude = 0.3
+                let variation = sin(wavePhase * 2) * 0.15 + Double.random(in: -0.05...0.05)
+                amplitude = max(0.2, min(0.6, baseAmplitude + variation))
             }
         }
     }
@@ -130,8 +257,9 @@ struct CircularWaveformView: View {
     private func stopAnimation() {
         timer?.invalidate()
         timer = nil
-        withAnimation(.easeOut(duration: 0.3)) {
+        withAnimation(.easeOut(duration: 0.4)) {
             amplitude = 0.1
+            wavePhase = 0
         }
     }
 }

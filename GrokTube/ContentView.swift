@@ -10,7 +10,7 @@ import MapKit
 import CoreLocation
 import Combine
 
-/// Main content view for Grok Pause London
+/// Main content view for Grok Tube
 struct ContentView: View {
     @StateObject private var voiceManager = VoiceManager()
     @StateObject private var locationManager = LocationManager()
@@ -203,7 +203,7 @@ struct HeaderView: View {
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Grok Pause")
+                Text("Grok Tube")
                     .font(.largeTitle.bold())
                     .foregroundColor(.primary)
                 
@@ -240,9 +240,33 @@ struct HeaderView: View {
 struct VoiceInterfaceCard: View {
     @ObservedObject var voiceManager: VoiceManager
     @Binding var transcript: String
+    @State private var textInput = ""
+    @State private var showTextInput = false
+    @FocusState private var isTextFieldFocused: Bool
     
     var body: some View {
         VStack(spacing: 20) {
+            // Connection status badge
+            HStack {
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 8, height: 8)
+                Text(voiceManager.connectionStatus)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                Spacer()
+                
+                // Text input toggle
+                Button(action: { 
+                    withAnimation { showTextInput.toggle() }
+                }) {
+                    Image(systemName: showTextInput ? "mic.fill" : "keyboard")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(.horizontal, 4)
+            
             // Response text
             VStack(alignment: .leading, spacing: 8) {
                 if !voiceManager.grokResponse.isEmpty {
@@ -269,7 +293,7 @@ struct VoiceInterfaceCard: View {
                 }
                 
                 if voiceManager.grokResponse.isEmpty && voiceManager.transcript.isEmpty {
-                    Text(transcript)
+                    Text(voiceManager.isConnected ? "Ask me anything about London's calm spots..." : transcript)
                         .font(.body)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
@@ -288,38 +312,81 @@ struct VoiceInterfaceCard: View {
                     .padding(.horizontal)
             }
             
-            // Mic button
-            VStack(spacing: 8) {
-                ZStack {
-                    // Pulsing background
-                    if voiceManager.isListening {
-                        PulsingRingView(color: .red, isActive: true)
-                            .frame(width: 100, height: 100)
-                    }
+            // Processing indicator
+            if voiceManager.isProcessing {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("Thinking...")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            if showTextInput {
+                // Text input mode
+                HStack(spacing: 12) {
+                    TextField("Type your message...", text: $textInput)
+                        .textFieldStyle(.plain)
+                        .padding(12)
+                        .background(Color.gray.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                        .focused($isTextFieldFocused)
+                        .onSubmit { sendTextMessage() }
                     
-                    // Waveform
-                    if voiceManager.isListening {
-                        CircularWaveformView(isRecording: .constant(true))
-                            .frame(width: 90, height: 90)
-                    }
-                    
-                    Button(action: toggleListening) {
+                    Button(action: sendTextMessage) {
                         ZStack {
                             Circle()
-                                .fill(voiceManager.isListening ? Color.red : Color.green)
-                                .frame(width: 80, height: 80)
-                                .shadow(color: (voiceManager.isListening ? Color.red : Color.green).opacity(0.4), radius: 15)
+                                .fill(textInput.isEmpty ? Color.gray.opacity(0.3) : Color.green)
+                                .frame(width: 44, height: 44)
                             
-                            Image(systemName: voiceManager.isListening ? "mic.fill" : "mic")
-                                .font(.system(size: 32))
+                            Image(systemName: "arrow.up")
+                                .font(.system(size: 18, weight: .semibold))
                                 .foregroundColor(.white)
                         }
                     }
+                    .disabled(textInput.isEmpty || !voiceManager.isConnected)
                 }
-                
-                Text(voiceManager.isListening ? "Listening..." : "Tap to talk")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                .onAppear {
+                    // Connect when text input appears
+                    if !voiceManager.isConnected {
+                        connectToGrok()
+                    }
+                }
+            } else {
+                // Voice input mode - Mic button
+                VStack(spacing: 8) {
+                    ZStack {
+                        // Pulsing background
+                        if voiceManager.isListening {
+                            PulsingRingView(color: .red, isActive: true)
+                                .frame(width: 100, height: 100)
+                        }
+                        
+                        // Waveform
+                        if voiceManager.isListening {
+                            CircularWaveformView(isRecording: .constant(true))
+                                .frame(width: 90, height: 90)
+                        }
+                        
+                        Button(action: toggleListening) {
+                            ZStack {
+                                Circle()
+                                    .fill(buttonColor)
+                                    .frame(width: 80, height: 80)
+                                    .shadow(color: buttonColor.opacity(0.4), radius: 15)
+                                
+                                Image(systemName: buttonIcon)
+                                    .font(.system(size: 32))
+                                    .foregroundColor(.white)
+                            }
+                        }
+                    }
+                    
+                    Text(buttonLabel)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
             
             // Error message
@@ -328,6 +395,7 @@ struct VoiceInterfaceCard: View {
                     .font(.caption)
                     .foregroundColor(.red)
                     .padding(.horizontal)
+                    .multilineTextAlignment(.center)
             }
         }
         .padding()
@@ -338,14 +406,70 @@ struct VoiceInterfaceCard: View {
         )
     }
     
-    private func toggleListening() {
+    private var statusColor: Color {
+        switch voiceManager.connectionStatus {
+        case "Connected", "Session Ready", _ where voiceManager.connectionStatus.contains("Ready"):
+            return .green
+        case "Connecting...":
+            return .orange
+        case "Error", "Disconnected":
+            return .red
+        default:
+            return .gray
+        }
+    }
+    
+    private var buttonColor: Color {
         if voiceManager.isListening {
-            voiceManager.stopSession()
+            return .red
+        } else if voiceManager.isConnected {
+            return .green
         } else {
+            return .blue
+        }
+    }
+    
+    private var buttonIcon: String {
+        if voiceManager.isListening {
+            return "stop.fill"
+        } else {
+            return "mic.fill"
+        }
+    }
+    
+    private var buttonLabel: String {
+        if voiceManager.isListening {
+            return "Tap to stop"
+        } else if voiceManager.isConnected {
+            return "Tap to talk"
+        } else {
+            return "Tap to connect"
+        }
+    }
+    
+    private func connectToGrok() {
+        voiceManager.startSession { response in
+            transcript = response
+        }
+    }
+    
+    private func toggleListening() {
+        if voiceManager.isConnected {
+            voiceManager.toggleListening()
+        } else {
+            // Start session first
             voiceManager.startSession { response in
                 transcript = response
             }
         }
+    }
+    
+    private func sendTextMessage() {
+        guard !textInput.isEmpty else { return }
+        let message = textInput
+        textInput = ""
+        isTextFieldFocused = false
+        voiceManager.sendTextMessage(message)
     }
 }
 
@@ -578,7 +702,8 @@ struct MapExploreView: View {
                 cameraPosition: $cameraPosition,
                 spots: CalmSpot.allSpots
             ) { spot in
-                showSpotDetail = true
+                // Spot selected - the inline card will show automatically
+                // Don't trigger the sheet here to avoid double UI
             }
             .ignoresSafeArea()
             
@@ -588,6 +713,8 @@ struct MapExploreView: View {
                     selectedSpot = nil
                 } onGetDirections: {
                     openDirections(to: spot)
+                } onShowFullDetail: {
+                    showSpotDetail = true
                 }
                 .padding()
                 .transition(.move(edge: .bottom).combined(with: .opacity))

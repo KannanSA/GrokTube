@@ -11,6 +11,8 @@ import AVFoundation
 
 @main
 struct GrokTubeApp: App {
+    @State private var showSplash = true
+    
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Item.self,
@@ -34,22 +36,39 @@ struct GrokTubeApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .preferredColorScheme(.none) // Respect system setting
+            ZStack {
+                ContentView()
+                    .preferredColorScheme(.none)
+                
+                // Splash screen overlay
+                if showSplash {
+                    SplashScreenView()
+                        .transition(.opacity)
+                        .zIndex(1)
+                }
+            }
+            .onAppear {
+                // Dismiss splash after delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    withAnimation(.easeOut(duration: 0.5)) {
+                        showSplash = false
+                    }
+                }
+            }
         }
         .modelContainer(sharedModelContainer)
     }
     
     private func configureAudioSession() {
+        // Configure audio session for playback only on launch
+        // Recording session is configured when mic is actually needed
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playAndRecord, mode: .voiceChat, options: [
-                .defaultToSpeaker,
-                .allowBluetooth,
-                .allowBluetoothA2DP,
-                .mixWithOthers
+            try session.setCategory(.playback, mode: .default, options: [
+                .mixWithOthers,
+                .duckOthers
             ])
-            try session.setActive(true)
+            // Don't activate here - let it activate on demand
         } catch {
             print("Failed to configure audio session: \(error)")
         }
