@@ -127,15 +127,15 @@ struct ParkImagePlaceholder: View {
     private var gradientColors: [Color] {
         // Different gradients based on tags
         if spot.tags.contains("Japanese") || spot.tags.contains("Peaceful") {
-            return [.green.opacity(0.8), .mint.opacity(0.6)]
+            return [TubeTheme.sage.opacity(0.8), TubeTheme.sageDeep.opacity(0.6)]
         } else if spot.tags.contains("Historic") {
             return [.brown.opacity(0.7), .orange.opacity(0.5)]
         } else if spot.tags.contains("Wildlife") || spot.tags.contains("Nature") {
-            return [.green.opacity(0.7), .teal.opacity(0.5)]
+            return [TubeTheme.sage.opacity(0.7), TubeTheme.sageDeep.opacity(0.5)]
         } else if spot.tags.contains("Indoor") {
             return [.purple.opacity(0.6), .pink.opacity(0.4)]
         } else {
-            return [.green.opacity(0.7), .blue.opacity(0.5)]
+            return [TubeTheme.sage.opacity(0.7), TubeTheme.charcoal]
         }
     }
 }

@@ -86,7 +86,7 @@ struct Map3DView: View {
                     MapPolyline(route!.polyline)
                         .stroke(
                             LinearGradient(
-                                colors: [.blue, .cyan],
+                                colors: [TubeTheme.undergroundRed, TubeTheme.sage],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             ),
@@ -95,6 +95,8 @@ struct Map3DView: View {
                 }
             }
             .mapStyle(mapStyle.style)
+            .colorScheme(.dark)
+            .preferredColorScheme(.dark)
             .mapControls {
                 MapCompass()
                     .mapControlVisibility(.visible)
@@ -103,6 +105,15 @@ struct Map3DView: View {
             }
             .onMapCameraChange(frequency: .continuous) { context in
                 // Track camera changes for smooth animations
+            }
+            .onChange(of: selectedSpot?.name) { _, _ in
+                guard let spot = selectedSpot else { return }
+                flyToSelectedSpot(spot)
+            }
+            .onAppear {
+                if let spot = selectedSpot {
+                    flyToSelectedSpot(spot)
+                }
             }
             
             // Floating controls
@@ -126,7 +137,7 @@ struct Map3DView: View {
                         Button(action: toggle3DView) {
                             Image(systemName: "cube.fill")
                                 .font(.title3)
-                                .foregroundColor(mapStyle == .realistic3D ? .blue : .primary)
+                                .foregroundColor(mapStyle == .realistic3D ? TubeTheme.undergroundRed : .primary)
                                 .frame(width: 44, height: 44)
                                 .background(.ultraThinMaterial)
                                 .clipShape(Circle())
@@ -145,7 +156,7 @@ struct Map3DView: View {
                         }
                     }
                     .padding(.trailing, 16)
-                    .padding(.top, 60)
+                    .padding(.top, 168)
                 }
                 
                 Spacer()
@@ -160,7 +171,7 @@ struct Map3DView: View {
                         selectedStyle: $mapStyle,
                         isPresented: $showStylePicker
                     )
-                    .padding(.bottom, selectedSpot != nil ? 220 : 100)
+                    .padding(.bottom, 280)
                 }
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
@@ -173,24 +184,24 @@ struct Map3DView: View {
     private func selectSpot(_ spot: CalmSpot) {
         withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
             selectedSpot = spot
-            
-            // Cinematic camera animation to selected spot
+        }
+        onSpotSelected(spot)
+    }
+    
+    private func flyToSelectedSpot(_ spot: CalmSpot) {
+        withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
             cameraPosition = .camera(
                 MapCamera(
                     centerCoordinate: spot.coordinate,
                     distance: 800,
-                    heading: Double.random(in: 0...360), // Random angle for variety
-                    pitch: 70 // High pitch for immersive 3D view
+                    heading: 20,
+                    pitch: 60
                 )
             )
         }
-        
-        onSpotSelected(spot)
-        
-        // Calculate route from nearest tube
         calculateWalkingRoute(from: spot.nearestTube.coordinate, to: spot.coordinate)
     }
-    
+
     private func toggle3DView() {
         // Get current camera position for reference
         let londonCenter = CLLocationCoordinate2D(latitude: 51.5074, longitude: -0.1278)
@@ -277,7 +288,7 @@ struct Spot3DMarkerView: View {
                     Circle()
                         .fill(
                             RadialGradient(
-                                colors: [.green.opacity(0.6), .clear],
+                                colors: [TubeTheme.sage.opacity(0.6), .clear],
                                 center: .center,
                                 startRadius: 0,
                                 endRadius: 40
@@ -399,9 +410,9 @@ struct Spot3DMarkerView: View {
     
     private var crowdColor: Color {
         switch spot.crowdLevel {
-        case .quiet: return .green
+        case .quiet: return TubeTheme.sage
         case .moderate: return .orange
-        case .busy: return .red
+        case .busy: return TubeTheme.undergroundRed
         }
     }
 }
@@ -493,7 +504,7 @@ struct MapStylePickerView: View {
                     VStack(spacing: 6) {
                         ZStack {
                             Circle()
-                                .fill(selectedStyle == style ? Color.blue : Color.gray.opacity(0.2))
+                                .fill(selectedStyle == style ? TubeTheme.undergroundRed : Color.gray.opacity(0.2))
                                 .frame(width: 50, height: 50)
                             
                             Image(systemName: style.icon)
@@ -503,7 +514,7 @@ struct MapStylePickerView: View {
                         
                         Text(style.rawValue)
                             .font(.caption2)
-                            .foregroundColor(selectedStyle == style ? .blue : .secondary)
+                            .foregroundColor(selectedStyle == style ? TubeTheme.undergroundRed : .secondary)
                     }
                 }
             }
@@ -541,7 +552,7 @@ struct SpotDetailCard: View {
                         .frame(height: 120)
                 } else {
                     LinearGradient(
-                        colors: [.green.opacity(0.8), .mint.opacity(0.6)],
+                        colors: [TubeTheme.sage.opacity(0.8), TubeTheme.sageDeep.opacity(0.6)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
@@ -609,8 +620,8 @@ struct SpotDetailCard: View {
                                 .font(.caption)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 5)
-                                .background(Color.green.opacity(0.1))
-                                .foregroundColor(.green)
+                                .background(TubeTheme.sage.opacity(0.18))
+                                .foregroundStyle(TubeTheme.sage)
                                 .clipShape(Capsule())
                         }
                     }
@@ -667,7 +678,7 @@ struct SpotDetailCard: View {
                             .font(.subheadline.bold())
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
-                            .background(Color.blue)
+                            .background(TubeTheme.undergroundRed)
                             .foregroundColor(.white)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
@@ -698,7 +709,7 @@ struct SpotDetailCard: View {
             }
             .padding()
         }
-        .background(Color(.systemBackground))
+        .background(TubeTheme.charcoal)
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 10)
         .task {
@@ -711,9 +722,9 @@ struct SpotDetailCard: View {
     
     private var crowdColor: Color {
         switch spot.crowdLevel {
-        case .quiet: return .green
+        case .quiet: return TubeTheme.sage
         case .moderate: return .orange
-        case .busy: return .red
+        case .busy: return TubeTheme.undergroundRed
         }
     }
 }
@@ -745,7 +756,7 @@ struct WeatherMiniCard: View {
                 .frame(maxWidth: 140)
         }
         .padding()
-        .background(Color.blue.opacity(0.08))
+        .background(TubeTheme.sage.opacity(0.12))
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
     

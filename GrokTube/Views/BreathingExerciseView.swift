@@ -2,35 +2,35 @@
 //  BreathingExerciseView.swift
 //  GrokTube
 //
-//  Created by Kannan Sekar Annu Radha on 25/12/2025.
+//  Immersive full-screen sage breathing — INHALE, 4 of 8 breaths, cream/red bar, close X.
 //
 
 import SwiftUI
 
-/// Beautiful animated breathing exercise view
+/// Immersive animated breathing exercise. No tab bar; dismiss with the close control.
 struct BreathingExerciseView: View {
-    @State private var isAnimating = false
     @State private var breathPhase: BreathPhase = .inhale
-    @State private var scale: CGFloat = 0.5
-    @State private var circleOpacity: Double = 0.3
+    @State private var scale: CGFloat = 0.55
+    @State private var circleOpacity: Double = 0.4
     @State private var timer: Timer?
-    @State private var cycleCount = 0
+    @State private var breathCount = 0
     @State private var isActive = false
-    
-    let totalCycles: Int
+    @State private var phaseProgress: CGFloat = 0
+
+    let totalBreaths: Int
     let onComplete: () -> Void
-    
-    init(cycles: Int = 4, onComplete: @escaping () -> Void = {}) {
-        self.totalCycles = cycles
+
+    init(cycles: Int = 8, onComplete: @escaping () -> Void = {}) {
+        self.totalBreaths = max(cycles, 1)
         self.onComplete = onComplete
     }
-    
+
     enum BreathPhase: String {
-        case inhale = "Breathe In"
-        case hold = "Hold"
-        case exhale = "Breathe Out"
-        case rest = "Rest"
-        
+        case inhale = "INHALE"
+        case hold = "HOLD"
+        case exhale = "EXHALE"
+        case rest = "REST"
+
         var duration: Double {
             switch self {
             case .inhale: return 4.0
@@ -39,7 +39,7 @@ struct BreathingExerciseView: View {
             case .rest: return 2.0
             }
         }
-        
+
         var next: BreathPhase {
             switch self {
             case .inhale: return .hold
@@ -48,204 +48,201 @@ struct BreathingExerciseView: View {
             case .rest: return .inhale
             }
         }
-        
-        var color: Color {
-            switch self {
-            case .inhale: return .cyan
-            case .hold: return .purple
-            case .exhale: return .green
-            case .rest: return .orange
-            }
-        }
     }
-    
+
     var body: some View {
         ZStack {
-            // Background gradient
-            LinearGradient(
+            TubeTheme.night.ignoresSafeArea()
+
+            RadialGradient(
                 colors: [
-                    breathPhase.color.opacity(0.3),
-                    Color(.systemBackground)
+                    TubeTheme.sage.opacity(0.22),
+                    TubeTheme.night
                 ],
-                startPoint: .top,
-                endPoint: .bottom
+                center: .center,
+                startRadius: 40,
+                endRadius: 420
             )
             .ignoresSafeArea()
-            .animation(.easeInOut(duration: 1), value: breathPhase)
-            
-            VStack(spacing: 40) {
-                // Title
-                Text("4-4-4-2 Box Breathing")
-                    .font(.title2.bold())
-                    .foregroundColor(.primary)
-                
-                // Cycle counter
-                Text("Cycle \(cycleCount + 1) of \(totalCycles)")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                
+            .animation(.easeInOut(duration: 1.1), value: breathPhase)
+
+            VStack(spacing: 0) {
+                HStack {
+                    Spacer()
+                    Button(action: dismiss) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(TubeTheme.cream)
+                            .frame(width: 36, height: 36)
+                            .background(Circle().fill(TubeTheme.charcoal))
+                            .overlay(Circle().stroke(TubeTheme.cream.opacity(0.12), lineWidth: 0.6))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Close")
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+
+                creamRedProgress
+                    .padding(.horizontal, 24)
+                    .padding(.top, 18)
+
                 Spacer()
-                
-                // Breathing circle animation
-                ZStack {
-                    // Outer glow rings
-                    ForEach(0..<3) { i in
-                        Circle()
-                            .stroke(breathPhase.color.opacity(0.2 - Double(i) * 0.05), lineWidth: 2)
-                            .frame(width: 200 + CGFloat(i * 40), height: 200 + CGFloat(i * 40))
-                            .scaleEffect(scale * (1 + CGFloat(i) * 0.1))
-                            .animation(
-                                .easeInOut(duration: breathPhase.duration)
-                                .delay(Double(i) * 0.1),
-                                value: scale
-                            )
-                    }
-                    
-                    // Main breathing circle
-                    Circle()
-                        .fill(
-                            RadialGradient(
-                                colors: [
-                                    breathPhase.color.opacity(0.8),
-                                    breathPhase.color.opacity(0.4),
-                                    breathPhase.color.opacity(0.1)
-                                ],
-                                center: .center,
-                                startRadius: 10,
-                                endRadius: 100
-                            )
-                        )
-                        .frame(width: 200, height: 200)
-                        .scaleEffect(scale)
-                        .opacity(circleOpacity)
-                        .shadow(color: breathPhase.color.opacity(0.5), radius: 30)
-                    
-                    // Inner circle with instruction
-                    Circle()
-                        .fill(Color(.systemBackground).opacity(0.9))
-                        .frame(width: 120, height: 120)
-                        .scaleEffect(scale * 0.9)
-                        .shadow(color: .black.opacity(0.1), radius: 10)
-                    
-                    // Instruction text
-                    VStack(spacing: 4) {
-                        Text(breathPhase.rawValue)
-                            .font(.headline)
-                            .foregroundColor(breathPhase.color)
-                        
-                        Text(String(format: "%.0fs", breathPhase.duration))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    .scaleEffect(scale * 0.9 + 0.1)
-                }
-                .frame(height: 300)
-                
+
+                sageCircle
+
                 Spacer()
-                
-                // Progress dots
-                HStack(spacing: 8) {
-                    ForEach(BreathPhase.allCases, id: \.self) { phase in
-                        Circle()
-                            .fill(breathPhase == phase ? phase.color : Color.gray.opacity(0.3))
-                            .frame(width: 12, height: 12)
-                            .scaleEffect(breathPhase == phase ? 1.2 : 1.0)
-                            .animation(.spring(), value: breathPhase)
-                    }
-                }
-                
-                // Control button
-                Button(action: {
-                    if isActive {
-                        stopBreathing()
-                    } else {
-                        startBreathing()
-                    }
-                }) {
-                    HStack {
-                        Image(systemName: isActive ? "stop.fill" : "play.fill")
-                        Text(isActive ? "Stop" : "Start")
-                    }
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .frame(width: 150, height: 50)
-                    .background(isActive ? Color.red : breathPhase.color)
-                    .clipShape(Capsule())
-                    .shadow(color: (isActive ? Color.red : breathPhase.color).opacity(0.4), radius: 10)
-                }
-                .padding(.bottom, 40)
+
+                Text("\(displayBreath) of \(totalBreaths) breaths")
+                    .font(.system(size: 15, weight: .medium, design: .rounded))
+                    .foregroundStyle(TubeTheme.creamMuted)
+                    .padding(.bottom, 48)
             }
-            .padding()
+        }
+        .preferredColorScheme(.dark)
+        .statusBarHidden(true)
+        .onAppear { startBreathing() }
+        .onDisappear { stopBreathing() }
+    }
+
+    private var displayBreath: Int {
+        min(max(breathCount, 0) + 1, totalBreaths)
+    }
+
+    private var overallProgress: CGFloat {
+        let completed = CGFloat(breathCount) / CGFloat(totalBreaths)
+        let current = phaseProgress / CGFloat(totalBreaths)
+        return min(1, completed + current)
+    }
+
+    private var creamRedProgress: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule(style: .continuous)
+                    .fill(TubeTheme.cream.opacity(0.22))
+                Capsule(style: .continuous)
+                    .fill(TubeTheme.undergroundRed)
+                    .frame(width: max(8, geo.size.width * overallProgress))
+            }
+        }
+        .frame(height: 6)
+        .animation(.linear(duration: 0.2), value: overallProgress)
+    }
+
+    private var sageCircle: some View {
+        ZStack {
+            ForEach(0..<3, id: \.self) { i in
+                Circle()
+                    .stroke(TubeTheme.sage.opacity(0.18 - Double(i) * 0.04), lineWidth: 1.5)
+                    .frame(width: 220 + CGFloat(i * 48), height: 220 + CGFloat(i * 48))
+                    .scaleEffect(scale * (1 + CGFloat(i) * 0.06))
+            }
+
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [
+                            TubeTheme.sage.opacity(0.95),
+                            TubeTheme.sageDeep.opacity(0.7),
+                            TubeTheme.sage.opacity(0.15)
+                        ],
+                        center: .center,
+                        startRadius: 8,
+                        endRadius: 130
+                    )
+                )
+                .frame(width: 220, height: 220)
+                .scaleEffect(scale)
+                .opacity(circleOpacity)
+                .shadow(color: TubeTheme.sage.opacity(0.55), radius: 40)
+
+            Text(breathPhase.rawValue)
+                .font(.system(size: 28, weight: .heavy, design: .default))
+                .fontWidth(.condensed)
+                .tracking(4)
+                .foregroundStyle(TubeTheme.cream)
+                .shadow(color: .black.opacity(0.35), radius: 8)
+        }
+        .frame(height: 340)
+        .contentShape(Circle())
+        .onTapGesture {
+            if isActive {
+                stopBreathing()
+            } else {
+                startBreathing()
+            }
         }
     }
-    
+
+    private func dismiss() {
+        stopBreathing()
+        onComplete()
+    }
+
     private func startBreathing() {
         isActive = true
-        cycleCount = 0
+        breathCount = 0
         breathPhase = .inhale
+        phaseProgress = 0
         animatePhase()
     }
-    
+
     private func stopBreathing() {
         isActive = false
         timer?.invalidate()
         timer = nil
-        
-        withAnimation(.easeOut(duration: 0.5)) {
-            scale = 0.5
-            circleOpacity = 0.3
+        withAnimation(.easeOut(duration: 0.45)) {
+            scale = 0.55
+            circleOpacity = 0.4
+            phaseProgress = 0
         }
     }
-    
+
     private func animatePhase() {
         guard isActive else { return }
-        
-        // Animate scale based on phase
+
+        phaseProgress = 0
+        withAnimation(.linear(duration: breathPhase.duration)) {
+            phaseProgress = 1
+        }
+
         withAnimation(.easeInOut(duration: breathPhase.duration)) {
             switch breathPhase {
             case .inhale:
-                scale = 1.0
-                circleOpacity = 0.8
+                scale = 1.08
+                circleOpacity = 0.95
             case .hold:
-                scale = 1.0
-                circleOpacity = 0.9
+                scale = 1.08
+                circleOpacity = 1.0
             case .exhale:
-                scale = 0.5
-                circleOpacity = 0.4
+                scale = 0.55
+                circleOpacity = 0.45
             case .rest:
-                scale = 0.5
-                circleOpacity = 0.3
+                scale = 0.55
+                circleOpacity = 0.35
             }
         }
-        
-        // Schedule next phase
+
         timer = Timer.scheduledTimer(withTimeInterval: breathPhase.duration, repeats: false) { _ in
             let nextPhase = breathPhase.next
-            
-            // Check if completing a cycle
+
             if nextPhase == .inhale {
-                cycleCount += 1
-                if cycleCount >= totalCycles {
+                breathCount += 1
+                if breathCount >= totalBreaths {
                     stopBreathing()
                     onComplete()
                     return
                 }
             }
-            
+
             breathPhase = nextPhase
             animatePhase()
         }
     }
 }
 
-extension BreathingExerciseView.BreathPhase: CaseIterable {
-    static var allCases: [BreathingExerciseView.BreathPhase] {
-        [.inhale, .hold, .exhale, .rest]
-    }
-}
-
 #Preview {
-    BreathingExerciseView(cycles: 4) {
+    BreathingExerciseView(cycles: 8) {
         print("Breathing complete!")
     }
 }

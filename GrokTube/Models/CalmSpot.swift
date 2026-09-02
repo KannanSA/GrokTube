@@ -109,7 +109,63 @@ enum TubeLine: String, CaseIterable {
 
 /// Pre-defined London calm spots with real coordinates
 extension CalmSpot {
+    /// Ticket-row order: iconic parks first, then the rest of the catalogue.
+    static var featuredTicketSpots: [CalmSpot] {
+        let preferred = ["Hampstead Heath", "Kew Gardens", "Greenwich Park"]
+        let featured = preferred.compactMap { name in allSpots.first { $0.name == name } }
+        let rest = allSpots.filter { spot in !preferred.contains(spot.name) }
+        return featured + rest
+    }
+
     static let allSpots: [CalmSpot] = [
+        CalmSpot(
+            name: "Hampstead Heath",
+            description: "Wild heathland and bathing ponds above the city, with sweeping views from Parliament Hill.",
+            coordinate: CLLocationCoordinate2D(latitude: 51.5608, longitude: -0.1657),
+            nearestTube: TubeStation(
+                name: "Hampstead",
+                lines: [.northern],
+                coordinate: CLLocationCoordinate2D(latitude: 51.5567, longitude: -0.1783),
+                walkingMinutes: 12
+            ),
+            imageURL: "https://images.unsplash.com/photo-1528909514045-2fa4ac7a08ba?w=800",
+            systemImage: "leaf.fill",
+            tags: ["Heath", "Views", "Nature", "Ponds"],
+            openingHours: "Open 24 hours",
+            crowdLevel: .moderate
+        ),
+        CalmSpot(
+            name: "Kew Gardens",
+            description: "UNESCO botanic gardens with glasshouses, tree-lined avenues, and quiet corners to reset.",
+            coordinate: CLLocationCoordinate2D(latitude: 51.4787, longitude: -0.2956),
+            nearestTube: TubeStation(
+                name: "Kew Gardens",
+                lines: [.district, .overground],
+                coordinate: CLLocationCoordinate2D(latitude: 51.4773, longitude: -0.2850),
+                walkingMinutes: 8
+            ),
+            imageURL: "https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?w=800",
+            systemImage: "leaf.fill",
+            tags: ["Botanic", "Glasshouse", "Nature", "Family"],
+            openingHours: "10:00 AM - 6:00 PM",
+            crowdLevel: .moderate
+        ),
+        CalmSpot(
+            name: "Greenwich Park",
+            description: "Royal park on a hill above the Thames, with the Prime Meridian, ancient trees, and wide lawns.",
+            coordinate: CLLocationCoordinate2D(latitude: 51.4769, longitude: 0.0005),
+            nearestTube: TubeStation(
+                name: "Cutty Sark",
+                lines: [.dlr],
+                coordinate: CLLocationCoordinate2D(latitude: 51.4827, longitude: -0.0100),
+                walkingMinutes: 8
+            ),
+            imageURL: "https://images.unsplash.com/photo-1520986606214-8b456906c813?w=800",
+            systemImage: "building.columns.fill",
+            tags: ["Royal", "Views", "Park", "Historic"],
+            openingHours: "6:00 AM - Dusk",
+            crowdLevel: .moderate
+        ),
         CalmSpot(
             name: "Kyoto Garden",
             description: "A serene Japanese garden in Holland Park with koi ponds, waterfalls, and peacocks. Perfect for meditation.",

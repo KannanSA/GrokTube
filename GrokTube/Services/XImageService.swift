@@ -589,7 +589,7 @@ struct XImageView: View {
                 } else {
                     // Fallback gradient
                     LinearGradient(
-                        colors: [.green.opacity(0.6), .mint.opacity(0.4)],
+                        colors: [TubeTheme.sage.opacity(0.6), TubeTheme.sageDeep.opacity(0.4)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )

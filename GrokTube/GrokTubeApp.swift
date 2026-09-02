@@ -38,7 +38,8 @@ struct GrokTubeApp: App {
         WindowGroup {
             ZStack {
                 ContentView()
-                    .preferredColorScheme(.none)
+                    .preferredColorScheme(.dark)
+                    .tint(TubeTheme.undergroundRed)
                 
                 // Splash screen overlay
                 if showSplash {
@@ -75,16 +76,19 @@ struct GrokTubeApp: App {
     }
     
     private func customizeAppearance() {
-        // Tab bar appearance
-        let tabBarAppearance = UITabBarAppearance()
-        tabBarAppearance.configureWithDefaultBackground()
-        UITabBar.appearance().scrollEdgeAppearance = tabBarAppearance
-        UITabBar.appearance().standardAppearance = tabBarAppearance
-        
-        // Navigation bar appearance
         let navBarAppearance = UINavigationBarAppearance()
-        navBarAppearance.configureWithDefaultBackground()
+        navBarAppearance.configureWithTransparentBackground()
+        navBarAppearance.backgroundColor = UIColor(TubeTheme.night)
+        navBarAppearance.titleTextAttributes = [
+            .foregroundColor: UIColor(TubeTheme.cream)
+        ]
+        navBarAppearance.largeTitleTextAttributes = [
+            .foregroundColor: UIColor(TubeTheme.cream)
+        ]
         UINavigationBar.appearance().scrollEdgeAppearance = navBarAppearance
         UINavigationBar.appearance().standardAppearance = navBarAppearance
+        UINavigationBar.appearance().tintColor = UIColor(TubeTheme.undergroundRed)
+
+        UIView.appearance(whenContainedInInstancesOf: [UIAlertController.self]).tintColor = UIColor(TubeTheme.undergroundRed)
     }
 }

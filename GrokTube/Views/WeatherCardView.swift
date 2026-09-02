@@ -25,9 +25,13 @@ struct WeatherCardView: View {
             }
         }
         .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(.ultraThinMaterial)
-                .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(TubeTheme.charcoal)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(TubeTheme.cream.opacity(0.10), lineWidth: 0.6)
+                )
+                .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 5)
         )
     }
 }
@@ -43,11 +47,11 @@ struct WeatherContent: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("London Weather")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(TubeTheme.creamMuted)
                     
                     Text(weather.temperatureString)
                         .font(.system(size: 42, weight: .thin))
-                        .foregroundColor(.primary)
+                        .foregroundStyle(TubeTheme.cream)
                 }
                 
                 Spacer()
@@ -60,11 +64,11 @@ struct WeatherContent: View {
             // Condition
             Text(weather.condition.description)
                 .font(.headline)
-                .foregroundColor(.primary)
+                .foregroundStyle(TubeTheme.cream)
             
             Text(weather.feelsLikeString)
                 .font(.subheadline)
-                .foregroundColor(.secondary)
+                .foregroundStyle(TubeTheme.creamMuted)
             
             // Stats row
             HStack(spacing: 20) {
@@ -78,7 +82,7 @@ struct WeatherContent: View {
             // Recommendation
             Text(weather.recommendation)
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundStyle(TubeTheme.creamMuted)
                 .padding(.top, 8)
         }
         .padding()
@@ -94,7 +98,7 @@ struct WeatherStat: View {
         VStack(spacing: 4) {
             Image(systemName: icon)
                 .font(.system(size: 16))
-                .foregroundColor(.blue)
+                .foregroundStyle(TubeTheme.sage)
             
             Text(value)
                 .font(.caption.bold())
@@ -187,11 +191,12 @@ struct ErrorWeatherCard: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(.orange)
+                .foregroundStyle(.orange)
             
             VStack(alignment: .leading, spacing: 4) {
                 Text("Weather unavailable")
                     .font(.subheadline.bold())
+                    .foregroundStyle(TubeTheme.cream)
                 
                 Text("Check your connection")
                     .font(.caption)
