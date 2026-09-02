@@ -15,5 +15,7 @@
     <string>Your location helps us find the nearest calm spots and tube stations.</string>
     <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
     <string>Your location helps us find the nearest calm spots and tube stations.</string>
+    <key>UIUserInterfaceStyle</key>
+    <string>Dark</string>
 </dict>
 </plist>

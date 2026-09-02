@@ -117,19 +117,19 @@ struct AudioBar: View {
     
     private var barColors: [Color] {
         if amplitude > 0.7 {
-            return [.orange, .yellow]
+            return [TubeTheme.undergroundRed, TubeTheme.cream]
         } else if amplitude > 0.4 {
-            return [.green, .mint]
+            return [TubeTheme.sage, TubeTheme.cream]
         } else {
-            return [.green.opacity(0.7), .mint.opacity(0.5)]
+            return [TubeTheme.sage.opacity(0.7), TubeTheme.sageDeep.opacity(0.5)]
         }
     }
     
     private var shadowColor: Color {
         if amplitude > 0.7 {
-            return .orange.opacity(0.6)
+            return TubeTheme.undergroundRed.opacity(0.6)
         } else {
-            return .green.opacity(0.4)
+            return TubeTheme.sage.opacity(0.4)
         }
     }
 }
@@ -159,9 +159,9 @@ struct AudioLevelIndicator: View {
     
     private func barColor(for index: Int) -> Color {
         switch index {
-        case 0, 1: return .green
-        case 2, 3: return .yellow
-        default: return .red
+        case 0, 1: return TubeTheme.sage
+        case 2, 3: return TubeTheme.cream
+        default: return TubeTheme.undergroundRed
         }
     }
 }
@@ -214,12 +214,12 @@ struct CircularWaveformView: View {
             // Center mic icon
             ZStack {
                 Circle()
-                    .fill(isRecording ? Color.red.opacity(0.15) : Color.blue.opacity(0.1))
+                    .fill(isRecording ? TubeTheme.undergroundRed.opacity(0.15) : TubeTheme.sage.opacity(0.12))
                     .frame(width: 50, height: 50)
                 
                 Image(systemName: isRecording ? "mic.fill" : "mic")
                     .font(.system(size: 24, weight: .medium))
-                    .foregroundColor(isRecording ? .red : .blue)
+                    .foregroundColor(isRecording ? TubeTheme.undergroundRed : TubeTheme.sage)
                     .scaleEffect(isRecording ? 1.1 : 1.0)
             }
         }
@@ -239,7 +239,7 @@ struct CircularWaveformView: View {
         if isRecording {
             return ring == 0 ? .red : .orange
         }
-        return .blue
+        return TubeTheme.sage
     }
     
     private func startAnimation() {
